@@ -1,0 +1,28 @@
+#!/bin/bash
+
+QIN=$(lsusb | grep 'Qin' | cut -d" " -f2,4| cut -d ":" -f1 | sed -e 's/ /./g')
+MY_DRIVER="uni-t-ut372:conn="
+
+case "$1" in
+	--helpme | -hm)
+		echo "-r | --reload  to reload USB Connection (usb_modeswitch --reset-usb)"
+		exit
+		;;
+	--reload | -r)
+		shift 1
+		USB_ID=$(lsusb | grep 'Qin' | cut -d" " -f6 | sed -e 's/:/./g')
+		USB_VID=$(echo $USB_ID | cut -d"." -f1)
+		USB_PID=$(echo $USB_ID | cut -d"." -f2)
+		USB_MODESWITCH=$(sudo usb_modeswitch -v 0x$USB_VID -p 0x$USB_PID --reset-usb)
+
+		echo "RESTARTING USB: $USB_ID"
+		sudo echo "$USB_MODESWITCH"
+		;;
+esac
+
+DRIVER_PARAM="$MY_DRIVER$QIN $*"
+SIGROCK_CLI=$(sigrok-cli --driver $DRIVER_PARAM )
+
+# Start the view
+echo "STARTING WITH DRIVER PARAMS: $DRIVER_PARAM"
+echo "$SIGROCK_CLI"
