@@ -20,10 +20,8 @@ esac
 QIN=$(lsusb | grep 'Qin' | cut -d" " -f2,4| cut -d ":" -f1 | sed -e 's/ /./g')
 MY_DRIVER="uni-t-ut372:conn="
 DRIVER_PARAMS="$MY_DRIVER$QIN $*"
-#START_IT=$(smuview -d $DRIVER_PARAMS)
-START_IT=$(sigrok-cli -d $DRIVER_PARAMS)
-
 
 # Start the view
 echo "STARTING WITH DRIVER PARAMS: $DRIVER_PARAMS"
-echo "$START_IT"
+#echo "$START_IT"
+sigrok-cli -d $DRIVER_PARAMS
