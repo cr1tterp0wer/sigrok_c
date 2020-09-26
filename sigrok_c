@@ -49,6 +49,7 @@ MY_DRIVER="uni-t-ut372:conn="
 DRIVER_PARAMS="$MY_DRIVER$QIN $* "
 
 echo "STARTING WITH DRIVER PARAMS: $DRIVER_PARAMS"
+echo "@@"
 
 # User Specified Commands
 if [ $IS_STAMP = 0 ]; then
