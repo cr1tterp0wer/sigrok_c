@@ -1,27 +1,68 @@
 #!/bin/bash
 
-case "$1" in
-  --helpme | -hm)
-    echo "-r | --reload  to reload USB Connection (usb_modeswitch --reset-usb)"
-    exit
-    ;;
-  --reload | -r)
-    shift 1
-    USB_ID=$(lsusb | grep 'Qin' | cut -d" " -f6 | sed -e 's/:/./g')
-    USB_VID=$(echo $USB_ID | cut -d"." -f1)
-    USB_PID=$(echo $USB_ID | cut -d"." -f2)
-    USB_MODESWITCH=$(usb_modeswitch -v 0x$USB_VID -p 0x$USB_PID --reset-usb)
+##
+# Sigrok Wrapper CLI Tool
+# Christopher Apodaca
+# Sep 25, 2020
+# MIT License
+##
 
-    echo "RESTARTING USB: $USB_ID"
-    echo "$USB_MODESWITCH"
-    ;;
-esac
+IS_STAMP=0
+STAMP_REGX='^[0-9]+$'
+SAMPLE_SIZE=0
 
-QIN=$(lsusb | grep 'Qin' | cut -d" " -f2,4| cut -d ":" -f1 | sed -e 's/ /./g')
+while [ -n "$1" ]; do
+	case "$1" in
+	--helpme | -hm)
+		echo "-r | --reload  to reload USB Connection (usb_modeswitch --reset-usb)"
+		exit
+		;;
+	--reload | -r)
+		shift 1
+		USB_ID=$(lsusb | grep 'Qin' | cut -d" " -f6 | sed -e 's/:/./g')
+		USB_VID=$(echo $USB_ID | cut -d"." -f1)
+		USB_PID=$(echo $USB_ID | cut -d"." -f2)
+		USB_MODESWITCH=$(usb_modeswitch -v 0x$USB_VID -p 0x$USB_PID --reset-usb)
+
+		echo "RESTARTING USB: $USB_ID"
+		echo "$USB_MODESWITCH"
+		;;
+	--stamp)
+		shift 1
+		echo "ENVOKING TIME STAMPS"
+		IS_STAMP=1
+
+		if [[ $1 =~ $STAMP_REGX ]]; then
+			SAMPLE_SIZE=$1
+			shift 1
+		fi
+		;;
+		*)
+		break
+		;;
+	esac
+
+done
+
+QIN=$(lsusb | grep 'Qin' | cut -d" " -f2,4 | cut -d ":" -f1 | sed -e 's/ /./g')
 MY_DRIVER="uni-t-ut372:conn="
-DRIVER_PARAMS="$MY_DRIVER$QIN $*"
+DRIVER_PARAMS="$MY_DRIVER$QIN $* "
 
-# Start the view
 echo "STARTING WITH DRIVER PARAMS: $DRIVER_PARAMS"
-#echo "$START_IT"
-sigrok-cli -d $DRIVER_PARAMS
+
+# User Specified Commands
+if [ $IS_STAMP = 0 ]; then
+	sigrok-cli -d $DRIVER_PARAMS
+	exit
+fi
+
+# User specified sample size
+if [ $SAMPLE_SIZE -gt 0 ]; then
+	sigrok-cli -d $DRIVER_PARAMS --samples $SAMPLE_SIZE | xargs -L 1 bash -c 'printf "[%s] %s\n" "$(date +%s.%N)" "$*" ' bash
+	exit
+else
+	sigrok-cli -d $DRIVER_PARAMS --continuous | xargs -L 1 bash -c 'printf "[%s] %s\n" "$(date +%s.%N)" "$*" ' bash
+	exit
+fi
+
+exit
