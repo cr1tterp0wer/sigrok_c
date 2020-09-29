@@ -7,9 +7,20 @@
 # MIT License
 ##
 
-IS_STAMP=0
-STAMP_REGX='^[0-9]+$'
-SAMPLE_SIZE=0
+# TIMESTAMP GLOBALS
+IS_TIME=0
+
+# INTEGER REGEX
+INT_REGX='^[0-9]+$'
+
+# OUTPUT FORMAT 
+IS_OUTPUT=0
+OUTPUT_SIZE=0
+OUTPUT_ARG="--continuous"
+
+# RPM GLOBALS
+IS_RATIO=0
+RATIO=1
 
 while [ -n "$1" ]; do
 	case "$1" in
@@ -17,6 +28,7 @@ while [ -n "$1" ]; do
 		echo "-r | --reload  to reload USB Connection (usb_modeswitch --reset-usb)"
 		exit
 		;;
+
 	--reload | -r)
 		shift 1
 		USB_ID=$(lsusb | grep 'Qin' | cut -d" " -f6 | sed -e 's/:/./g')
@@ -27,16 +39,34 @@ while [ -n "$1" ]; do
 		echo "RESTARTING USB: $USB_ID"
 		echo "$USB_MODESWITCH"
 		;;
-	--stamp)
-		shift 1
-		echo "ENVOKING TIME STAMPS"
-		IS_STAMP=1
 
-		if [[ $1 =~ $STAMP_REGX ]]; then
-			SAMPLE_SIZE=$1
+	--timestamp)
+		shift 1
+		echo "INVOKING TIME STAMPS"
+		IS_TIME=1
+		;;
+
+	--output)
+		shift 1
+		IS_OUTPUT=1
+
+		if [[ $1 =~ $INT_REGX ]]; then
+			OUTPUT_SIZE=$1
 			shift 1
 		fi
 		;;
+
+	--ratio)
+		shift 1
+		echo "INVOKING RATIO"
+		IS_RATIO=1
+
+		if [[ $1 =~ $INT_REGX ]]; then
+			RATIO=$1
+			shift 1
+		fi
+		;;
+
 		*)
 		break
 		;;
@@ -46,24 +76,34 @@ done
 
 QIN=$(lsusb | grep 'Qin' | cut -d" " -f2,4 | cut -d ":" -f1 | sed -e 's/ /./g')
 MY_DRIVER="uni-t-ut372:conn="
-DRIVER_PARAMS="$MY_DRIVER$QIN $* "
+DRIVER_PARAMS="$MY_DRIVER$QIN "
+PARENT_ARGS="$*"
 
-echo "STARTING WITH DRIVER PARAMS: $DRIVER_PARAMS"
-echo "@@"
 
-# User Specified Commands
-if [ $IS_STAMP = 0 ]; then
-	sigrok-cli -d $DRIVER_PARAMS
-	exit
+## PARAMS LOGIC
+if [ $IS_TIME = 1 ]; then
+	TIME_ARG="| xargs -L 1 bash -c 'printf \"[%s] %s\n\" \"\$(date +%s.%N)\" \"\$*\" ' bash "
 fi
 
-# User specified sample size
-if [ $SAMPLE_SIZE -gt 0 ]; then
-	sigrok-cli -d $DRIVER_PARAMS --samples $SAMPLE_SIZE | xargs -L 1 bash -c 'printf "[%s] %s\n" "$(date +%s.%N)" "$*" ' bash
-	exit
-else
-	sigrok-cli -d $DRIVER_PARAMS --continuous | xargs -L 1 bash -c 'printf "[%s] %s\n" "$(date +%s.%N)" "$*" ' bash
-	exit
+if [[ $IS_OUTPUT = 1 && $OUTPUT_SIZE -gt 0 ]]; then
+	OUTPUT_ARG="--samples $OUTPUT_SIZE"
 fi
 
-exit
+if [ $IS_RATIO = 1 ]; then
+	FIELD="2"
+
+	if [[ $IS_TIME = 1 ]]; then
+		FIELD="3"
+	fi
+
+	GREP_ARG="grep P1"
+	CUT_ARG="cut -d' ' -f${FIELD}"
+	AWK_ARG="awk -v c=${RATIO} '{ \$0 /= c; print \$0 }' OFS='\n' "
+
+	RATIO_ARG="| $GREP_ARG | $CUT_ARG | $AWK_ARG"
+	PAREN_ARGS=""
+fi
+
+# EXECUTE
+EXECUTE="sigrok-cli -d $DRIVER_PARAMS $OUTPUT_ARG $TIME_ARG $RATIO_ARG $PARENT_ARGS "
+eval $EXECUTE
