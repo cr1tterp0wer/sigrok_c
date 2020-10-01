@@ -22,13 +22,22 @@ OUTPUT_ARG="--continuous"
 IS_RATIO=0
 RATIO=1
 
+# CLI flags
+IS_CUSTOM_STDOUT=0 # If we should customize the ouput
+
 while [ -n "$1" ]; do
 	case "$1" in
 	--helpme | -hm)
-		echo "-r | --reload  to reload USB Connection (usb_modeswitch --reset-usb)"
-		echo "   | --timestamp print timestamps)"
-		echo "   | --output prints a specified number of rows, if not issued prints continuously)"
-		echo "   | --ratio value to divide RPM )"
+		echo " "
+		echo " SIGROK-CLI WRAPPER "
+		echo " "
+		echo "-r | --reload          to reload USB Connection (usb_modeswitch --reset-usb)"
+		echo "   | --timestamp       print timestamps)"
+		echo "   | --output <val>    prints the specified number<val> of rows, if not issued prints continuously)"
+		echo "   | --ratio  <val>    ratio<val> to divide RPM )"
+		echo " "
+		echo "Standard sigrok commands are passed through as normal..."
+		echo " "
 		exit
 		;;
 
@@ -45,8 +54,8 @@ while [ -n "$1" ]; do
 
 	--timestamp)
 		shift 1
-		echo "INVOKING TIME STAMPS"
 		IS_TIME=1
+		IS_CUSTOM_STDOUT=1;
 		;;
 
 	--output)
@@ -61,11 +70,11 @@ while [ -n "$1" ]; do
 
 	--ratio)
 		shift 1
-		echo "INVOKING RATIO"
-		IS_RATIO=1
 
 		if [[ $1 =~ $INT_REGX ]]; then
+			IS_RATIO=1
 			RATIO=$1
+			IS_CUSTOM_STDOUT=1;
 			shift 1
 		fi
 		;;
@@ -82,31 +91,30 @@ MY_DRIVER="uni-t-ut372:conn="
 DRIVER_PARAMS="$MY_DRIVER$QIN "
 PARENT_ARGS="$*"
 
-
-## PARAMS LOGIC
-if [ $IS_TIME = 1 ]; then
-	TIME_ARG="| xargs -L 1 bash -c 'printf \"[%s] %s\n\" \"\$(date +%s.%N)\" \"\$*\" ' bash "
-fi
-
+# Perform standar Sigrok-cli commands
 if [[ $IS_OUTPUT = 1 && $OUTPUT_SIZE -gt 0 ]]; then
 	OUTPUT_ARG="--samples $OUTPUT_SIZE"
 fi
 
-if [ $IS_RATIO = 1 ]; then
-	FIELD="2"
+#Perform custom output commands
+if [ $IS_CUSTOM_STDOUT = 1 ]; then
 
-	if [[ $IS_TIME = 1 ]]; then
-		FIELD="3"
+	# CHECK for time & ratio
+	if [[ $IS_TIME = 1 && $IS_RATIO = 1 ]]; then
+		echo '[ TIMESTAMP ]          [ RPM ]'
+		STDOUT="| xargs -L 1 bash -c 'printf \"[%s] %.4f\n\" \"\$(date +%s.%N)\" \"\$(echo \"\$2/${RATIO}\" | bc -l)\" ' bash "
+	elif [ $IS_TIME = 1 ]; then
+		echo '[ TIMESTAMP ]'
+		STDOUT="| xargs -L 1 bash -c 'printf \"[%s] %s\n\" \"\$(date +%s.%N)\" \"\$*\" ' bash "
+	elif [ $IS_RATIO = 1 ]; then
+		echo '[ RPM ]'
+		STDOUT="| grep P1 | cut -d' ' -f2 | awk -v c=${RATIO} '{\$0 /=c; print \$0 }' OFS='\n' "
 	fi
-
-	GREP_ARG="grep P1"
-	CUT_ARG="cut -d' ' -f${FIELD}"
-	AWK_ARG="awk -v c=${RATIO} '{ \$0 /= c; print \$0 }' OFS='\n' "
-
-	RATIO_ARG="| $GREP_ARG | $CUT_ARG | $AWK_ARG"
-	PAREN_ARGS=""
+	EXECUTE="sigrok-cli -d $DRIVER_PARAMS $OUTPUT_ARG $PARENT_ARGS $STDOUT"
+else
+	EXECUTE="sigrok-cli -d $DRIVER_PARAMS $OUTPUT_ARG $PARENT_ARGS "
 fi
 
-# EXECUTE
-EXECUTE="sigrok-cli -d $DRIVER_PARAMS $OUTPUT_ARG $TIME_ARG $RATIO_ARG $PARENT_ARGS "
+# EXECUTE cli
 eval $EXECUTE
+exit
