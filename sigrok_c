@@ -26,6 +26,9 @@ while [ -n "$1" ]; do
 	case "$1" in
 	--helpme | -hm)
 		echo "-r | --reload  to reload USB Connection (usb_modeswitch --reset-usb)"
+		echo "   | --timestamp print timestamps)"
+		echo "   | --output prints a specified number of rows, if not issued prints continuously)"
+		echo "   | --ratio value to divide RPM )"
 		exit
 		;;
 
