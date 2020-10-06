@@ -101,13 +101,13 @@ if [ $IS_CUSTOM_STDOUT = 1 ]; then
 
 	# CHECK for time & ratio
 	if [[ $IS_TIME = 1 && $IS_RATIO = 1 ]]; then
-		echo '[ TIMESTAMP ]          [ RPM ]'
-		STDOUT="| xargs -L 1 bash -c 'printf \"[%s] %.4f\n\" \"\$(date +%s.%N)\" \"\$(echo \"\$2/${RATIO}\" | bc -l)\" ' bash "
+		echo ' TIMESTAMP,           RPM'
+		STDOUT="| xargs -L 1 bash -c 'printf \"%s, %.4f\n\" \"\$(date +%s.%N)\" \"\$(echo \"\$2/${RATIO}\" | bc -l)\" ' bash "
 	elif [ $IS_TIME = 1 ]; then
-		echo '[ TIMESTAMP ]'
-		STDOUT="| xargs -L 1 bash -c 'printf \"[%s] %s\n\" \"\$(date +%s.%N)\" \"\$*\" ' bash "
+		echo ' TIMESTAMP, '
+		STDOUT="| xargs -L 1 bash -c 'printf \"%s, %s\n\" \"\$(date +%s.%N)\" \"\$*\" ' bash "
 	elif [ $IS_RATIO = 1 ]; then
-		echo '[ RPM ]'
+		echo ' RPM '
 		STDOUT="| grep P1 | cut -d' ' -f2 | awk -v c=${RATIO} '{\$0 /=c; print \$0 }' OFS='\n' "
 	fi
 	EXECUTE="sigrok-cli -d $DRIVER_PARAMS $OUTPUT_ARG $PARENT_ARGS $STDOUT"
